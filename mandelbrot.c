@@ -19,6 +19,23 @@ typedef struct{
     int thread_id;
 } MandelbrotArgs;
 
+int converter_int(const char *str, int *valor)
+{
+    char*fim;
+    long resultado;
+
+    errno = 0;
+    resultado = strtol(str, &fim, 10);
+
+    if (errno != 0 || *fim != '\0' || resultado < INT_MIN || resultado > INT_MAX) {
+        return 0;
+    }
+    if (resultado < 1 || resultado > INT_MAX) {
+        return 0;
+    }
+    *valor = (int)resultado;
+    return 1;
+}
 int main(int argc, char *argv[]){
 
     if(argc != 5){

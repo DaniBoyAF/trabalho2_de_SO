@@ -1,5 +1,23 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <limits.h>
+#include <stdint.h>
+#include <time.h>
+#include <pthread.h>
+#include <omp.h>
+
+#define LOGIN "SEU_LOGIN"
+
+typedef struct{
+    int largura;
+    int altura;
+    int max_iteracoes;
+    int num_threads;
+    int *pixels;
+    int thread_id;
+} MandelbrotArgs;
 
 int main(int argc, char *argv[]){
 

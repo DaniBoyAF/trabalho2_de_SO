@@ -36,6 +36,29 @@ int converter_int(const char *str, int *valor)
     *valor = (int)resultado;
     return 1;
 }
+int calcular_mandelbrot(double x0, double y0,
+int max_iteracoes){
+
+    double z_real = 0.0;
+    double z_imag = 0.0;
+    int iteracoes ;
+
+    for(iteracoes =0 ; iteracoes < max_iteracoes; iteraçoes++){
+        double novo_zreal;
+        double novo_zimag;
+    
+
+    novo_zreal = z_real * z_real - z_imag * z_imag + x0;
+    novo_zimag = 2.0 * z_real * z_imag + y0;
+    z_real = novo_zreal;
+    z_imag = novo_zimag;
+    if(z_real * z_real + z_imag * z_imag > 4.0){
+        break;
+    }
+    
+    return iteracoes;
+}
+
 int main(int argc, char *argv[]){
 
     if(argc != 5){

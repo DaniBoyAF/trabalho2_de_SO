@@ -58,6 +58,26 @@ int max_iteracoes){
     
     return iteracoes;
 }
+double converter_real(int x, int largura)
+{
+    return -2.0 +
+           (double)x * 3.0 / (double)(largura - 1);
+}
+
+
+double converter_imag(int y, int altura)
+{
+    return -1.5 +
+           (double)y * 3.0 / (double)(altura - 1);
+}
+
+int calcular_intensidade(int iteracoes, int max_iteracoes ){
+    
+    if(iteracoes == max_iteracoes){
+        return 0;
+    }
+    return (int)(255.0 * iteracoes / max_iteracoes);
+}
 
 int main(int argc, char *argv[]){
 

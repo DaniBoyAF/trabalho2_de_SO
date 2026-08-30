@@ -78,7 +78,39 @@ int calcular_intensidade(int iteracoes, int max_iteracoes ){
     }
     return (int)(255.0 * iteracoes / max_iteracoes);
 }
+void mandelbrot_serial(int *pixels, int largura, int altura, int max_iteracoes){
+  
+    int y;
+    for(y=0; y < altura; y++){
+        int x;
+        double c_imag = converter_imag(y,altura);
+        for(x=0; x < largura; x++){
+            double c_real = converter_real(x, largura);
+            int iteracoes = calcular_mandelbrot(c_real, c_imag, max_iteracoes);
+            int intensidade = calcular_intensidade(iteracoes, max_iteracoes);
+            pixels[y * largura + x] = intensidade;
+        }
+    }
+}
+void *pthread_blocos(void *arg){
+    ThreadData *dados =(ThreadData *)arg;
 
+    int inicio;
+    int fim;
+    
+
+    inicio = dados->thread_id * (dados->altura / dados->num_threads);
+    fim = (dados->thread_id + 1) * (dados->altura / dados->num_threads);
+
+    for(int y = inicio; y < fim; y++){
+        double c_imag = converter_imag(y, dados->altura);
+        for(int x = 0; x < dados->largura; x++){
+            double c_real = converter_real(x, dados->largura);
+            int iteracoes = calcular_mandelbrot(c_real, c_imag, dados->max_iteracoes);
+            int intensidade = calcular_intensidade(iteracoes, dados->max_iteracoes);
+            dados->pixels[y * dados->largura + x] = intensidade;
+    }
+}
 int main(int argc, char *argv[]){
 
     if(argc != 5){

@@ -8,7 +8,7 @@
 #include <pthread.h>
 #include <omp.h>
 
-#define LOGIN "SEU_LOGIN"
+#define LOGIN "abc123"
 
 /* ── FIX 3: ThreadData definida antes de ser usada ── */
 typedef struct {

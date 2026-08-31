@@ -1,4 +1,4 @@
-Tempo serial: 0.000888
-Tempo OpenMP: 0.000927
-Tempo Pthreads 1: 0.001066
-Tempo Pthreads 2: 0.000698
+Tempo serial: 0.366112
+Tempo OpenMP: 0.351421
+Tempo Pthreads 1: 0.349590
+Tempo Pthreads 2: 0.357726

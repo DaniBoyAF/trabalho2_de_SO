@@ -10,7 +10,11 @@
 
 #define LOGIN "abc123"
 
-/* ── FIX 3: ThreadData definida antes de ser usada ── */
+typedef struct {
+    int proxima_linha;
+    pthread_mutex_t mutex;
+} TrabalhoDinamico;
+
 typedef struct {
     int *pixels;
     int largura;
@@ -18,11 +22,8 @@ typedef struct {
     int max_iteracoes;
     int num_threads;
     int thread_id;
+    TrabalhoDinamico *trabalho; 
 } ThreadData;
-
-/* ────────────────────────────────────────────────────
-   Converte string para int com validação completa
-───────────────────────────────────────────────────── */
 int converter_int(const char *str, int *valor)
 {
     char *fim;
@@ -35,19 +36,13 @@ int converter_int(const char *str, int *valor)
         resultado < INT_MIN || resultado > INT_MAX) {
         return 0;
     }
-    /* FIX 6: só precisa checar o mínimo, INT_MAX já coberto acima */
+
     if (resultado < 1) {
         return 0;
     }
     *valor = (int)resultado;
     return 1;
 }
-
-/* ────────────────────────────────────────────────────
-   Calcula número de iterações de Mandelbrot para (x0, y0)
-   FIX 1: typo "iteraçoes" → "iteracoes"
-   FIX 2: chave de fechamento do for e da função corrigidas
-───────────────────────────────────────────────────── */
 int calcular_mandelbrot(double x0, double y0, int max_iteracoes)
 {
     double z_real = 0.0;
@@ -64,27 +59,16 @@ int calcular_mandelbrot(double x0, double y0, int max_iteracoes)
         }
     }                         
     return iteracoes;
-}                              
-
-/* ────────────────────────────────────────────────────
-   Mapeia coluna x → coordenada real [-2.0, 1.0]
-───────────────────────────────────────────────────── */
+}     
 double converter_real(int x, int largura)
 {
     return -2.0 + (double)x * 3.0 / (double)(largura - 1);
 }
 
-/* ────────────────────────────────────────────────────
-   Mapeia linha y → coordenada imaginária [-1.5, 1.5]
-───────────────────────────────────────────────────── */
 double converter_imag(int y, int altura)
 {
     return -1.5 + (double)y * 3.0 / (double)(altura - 1);
 }
-
-/* ────────────────────────────────────────────────────
-   Converte iterações em intensidade PGM [0, 255]
-───────────────────────────────────────────────────── */
 int calcular_intensidade(int iteracoes, int max_iteracoes)
 {
     if (iteracoes == max_iteracoes) {
@@ -92,10 +76,6 @@ int calcular_intensidade(int iteracoes, int max_iteracoes)
     }
     return (int)(255.0 * iteracoes / max_iteracoes);
 }
-
-/* ────────────────────────────────────────────────────
-   Versão serial
-───────────────────────────────────────────────────── */
 void mandelbrot_serial(int *pixels, int largura, int altura, int max_iteracoes)
 {
     int y;
@@ -110,10 +90,6 @@ void mandelbrot_serial(int *pixels, int largura, int altura, int max_iteracoes)
         }
     }
 }
-
-/* ────────────────────────────────────────────────────
-   Pthread — estratégia por blocos contíguos de linhas
-───────────────────────────────────────────────────── */
 void *pthread_blocos(void *arg)
 {
     ThreadData *dados = (ThreadData *)arg;
@@ -137,15 +113,20 @@ void *pthread_blocos(void *arg)
     }
     return NULL;
 }
-
-/* ────────────────────────────────────────────────────
-   Pthread — estratégia cíclica (round-robin por linha)
-───────────────────────────────────────────────────── */
-void *pthread_ciclico(void *arg)
+void *pthread_dinamico(void *arg)
 {
     ThreadData *dados = (ThreadData *)arg;
+    TrabalhoDinamico *trabalho = dados->trabalho;
 
-    for (int y = dados->thread_id; y < dados->altura; y += dados->num_threads) {
+    for (;;) {
+        pthread_mutex_lock(&trabalho->mutex);
+        int y = trabalho->proxima_linha++;
+        pthread_mutex_unlock(&trabalho->mutex);
+
+        if (y >= dados->altura) {
+            break;
+        }
+
         double c_imag = converter_imag(y, dados->altura);
         for (int x = 0; x < dados->largura; x++) {
             double c_real   = converter_real(x, dados->largura);
@@ -159,7 +140,7 @@ void *pthread_ciclico(void *arg)
 
 /* ────────────────────────────────────────────────────
    Lança e aguarda todas as threads pthread
-   estrategia 1 = blocos, 2 = cíclico
+   estrategia 1 = blocos (estático) · 2 = dinâmico (fila de trabalho)
 ───────────────────────────────────────────────────── */
 int executar_pthreads(int *pixels,
                       int largura,
@@ -177,6 +158,12 @@ int executar_pthreads(int *pixels,
         return 0;
     }
 
+    /* Estado compartilhado só é usado pela estratégia dinâmica, mas é
+       inicializado sempre — custo irrisório e simplifica o código. */
+    TrabalhoDinamico trabalho;
+    trabalho.proxima_linha = 0;
+    pthread_mutex_init(&trabalho.mutex, NULL);
+
     for (int i = 0; i < num_threads; i++) {
         dados[i].pixels        = pixels;
         dados[i].largura       = largura;
@@ -184,8 +171,9 @@ int executar_pthreads(int *pixels,
         dados[i].max_iteracoes = max_iteracoes;
         dados[i].num_threads   = num_threads;
         dados[i].thread_id     = i;
+        dados[i].trabalho      = &trabalho;
 
-        void *(*funcao)(void *) = (estrategia == 1) ? pthread_blocos : pthread_ciclico;
+        void *(*funcao)(void *) = (estrategia == 1) ? pthread_blocos : pthread_dinamico;
 
         int resultado = pthread_create(&threads[i], NULL, funcao, &dados[i]);
         if (resultado != 0) {
@@ -195,6 +183,7 @@ int executar_pthreads(int *pixels,
             }
             free(threads);
             free(dados);
+            pthread_mutex_destroy(&trabalho.mutex);
             return 0;
         }
     }
@@ -204,12 +193,14 @@ int executar_pthreads(int *pixels,
             fprintf(stderr, "Erro: falha ao aguardar thread.\n");
             free(threads);
             free(dados);
+            pthread_mutex_destroy(&trabalho.mutex);
             return 0;
         }
     }
 
     free(threads);
     free(dados);
+    pthread_mutex_destroy(&trabalho.mutex);
     return 1;
 }
 
@@ -354,7 +345,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    /* ── Pthreads — cíclico ── */
+    /* ── Pthreads — dinâmico (fila de trabalho) ── */
     inicio = obter_tempo();
     if (!executar_pthreads(pixels, largura, altura, max_iteracoes, num_threads, 2)) {
         free(pixels);
